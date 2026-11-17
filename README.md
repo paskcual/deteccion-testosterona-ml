@@ -2,6 +2,10 @@
 
 Proyecto final de Machine Learning (MIC, docente Olanda Prieto Ordaz). Entrena cuatro modelos (Regresión Logística, SVM, Random Forest y XGBoost) con la base NHANES 2021 a 2023 de hormonas sexuales masculinas. Los **tres con mejor ROC AUC en validación cruzada** (XGBoost, Random Forest y SVM) se integran en una aplicación web en Streamlit que recibe los datos de un paciente y devuelve la predicción de cada modelo. La Regresión Logística, que quedó cuarta, se conserva en el entrenamiento y en el reporte pero no está en la aplicación.
 
+**Aplicación desplegada:** https://deteccion-testosterona-ml.streamlit.app/
+
+Si al abrirla aparece un mensaje de que la app se durmió por inactividad, basta con pulsar el botón para despertarla (Streamlit Community Cloud duerme las apps tras 12 horas sin visitas) y espera un par de minutos mientras arranca.
+
 Continúa los proyectos F_1 (regresión logística) y F_2 (SVM) de la misma materia, con el mismo dataset, la misma partición y el mismo preprocesamiento.
 
 ## Contenido de la carpeta
@@ -99,6 +103,8 @@ Corre la aplicación con `streamlit.testing` y, con los mismos datos, carga los 
 | IMC y cintura vacíos | 16.77% (alerta) | 27.36% | 15.79% |
 
 ## Despliegue en Streamlit Community Cloud
+
+La aplicación está desplegada en https://deteccion-testosterona-ml.streamlit.app/ (repositorio `paskcual/deteccion-testosterona-ml`, rama `main`, archivo principal `app.py`). Los pasos para reproducir el despliegue son:
 
 La aplicación se publica desde un repositorio de **GitHub** (Streamlit Community Cloud no se conecta a GitLab). El repositorio puede ser esta carpeta tal cual, con `app.py` y `requirements.txt` en la raíz.
 
