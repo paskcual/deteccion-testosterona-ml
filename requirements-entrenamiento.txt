@@ -1,0 +1,8 @@
+# Dependencias para volver a entrenar los modelos con entrenamiento-modelos.ipynb
+# (incluye las de la aplicacion).
+-r requirements.txt
+seaborn==0.13.2
+nbformat
+nbconvert
+ipykernel
+jupyter

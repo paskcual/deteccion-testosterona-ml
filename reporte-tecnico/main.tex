@@ -1,0 +1,396 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage[authoryear,round]{natbib}
+\usepackage[hidelinks]{hyperref}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+\renewcommand{\arraystretch}{1.15}
+
+\title{Detección de posible deficiencia de testosterona en hombres adultos\\
+con Regresión Logística, SVM, Random Forest y XGBoost}
+\author{Jesús Pascual Garay Ordaz\\
+Matrícula 306025, Programa MIC\\
+Materia: Machine Learning\\
+Docente: Dra. Olanda Prieto Ordaz}
+\date{Noviembre de 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Este trabajo construye y compara cuatro modelos de clasificación, Regresión Logística, SVM, Random Forest y XGBoost, para identificar a hombres adultos con deficiencia de testosterona (testosterona total menor a 300 ng/dL) a partir de 13 variables clínicas, hormonales y de estilo de vida de la encuesta NHANES 2021 a 2023 del CDC, que incluye a 2514 hombres de los cuales el 22.2\% tiene la deficiencia, ya que normalmente esta condición solo se detecta con un análisis de sangre y muchas veces pasa desapercibida. Los cuatro modelos siguen el mismo procedimiento, con una partición 80/20 estratificada, un Pipeline que imputa y escala dentro de cada fold, una búsqueda de hiperparámetros con validación cruzada de 5 folds que maximiza el ROC AUC y un umbral de decisión que maximiza F2 sobre las predicciones fuera de muestra, lo que da prioridad a detectar los casos. En un conjunto de prueba de 503 hombres que se usó una sola vez, el SVM obtuvo el mejor ROC AUC (0.901), seguido por XGBoost (0.898), Random Forest (0.892) y Regresión Logística (0.866), aunque la diferencia entre los tres modelos no lineales es menor que la variación entre folds, y todos detectaron a cerca del 88\% de los casos con una precisión de 45\% a 55\%. SHBG y estradiol fueron las variables más importantes en los tres tipos de modelo. Los cuatro modelos se integraron en una interfaz en Streamlit que recibe los datos de un paciente y muestra la probabilidad de cada modelo, pensada como apoyo para decidir a quién conviene pedirle un análisis de sangre y no como diagnóstico ni como tamizaje de la población general.
+
+\medskip
+\noindent\textbf{Palabras clave:} deficiencia de testosterona, clasificación binaria, desbalance de clases, SVM, Random Forest, XGBoost, NHANES.
+\end{abstract}
+
+\tableofcontents
+
+%==========================================================================
+\section{Antecedentes}
+
+\subsection{La deficiencia de testosterona}
+
+La deficiencia de testosterona, también llamada hipogonadismo bioquímico, es una condición de los hombres adultos que se define con un criterio de laboratorio, ya que la guía de la American Urological Association considera razonable un corte de 300 ng/dL para la testosterona total y pide hacer el diagnóstico solo con dos mediciones tomadas por la mañana en días distintos y con síntomas o signos \citep{mulhall2018}, y la guía de la Endocrine Society coincide en que el diagnóstico requiere síntomas y una testosterona baja de forma consistente \citep{bhasin2018}. Esto implica que la condición solo se detecta cuando alguien pide el análisis, por lo que muchos casos pasan desapercibidos, y que una herramienta que use datos fáciles de obtener, como las medidas corporales y los antecedentes, podría ayudar a decidir a quién conviene pedirle ese análisis. Las consecuencias de no diagnosticarla incluyen pérdida de masa muscular, osteoporosis y problemas metabólicos, y se asocia con obesidad, diabetes e hipertensión.
+
+\subsection{Trabajos relacionados}
+
+Se revisaron seis trabajos que respaldan el uso de esta base de datos y de técnicas de clasificación similares, y que se resumen en la Tabla~\ref{tab:literatura}. Los que más se parecen a este proyecto son \citet{yu2025} y \citet{zhang2025}, que usan NHANES y el mismo criterio de 300 ng/dL pero con otros ciclos de la encuesta y otras variables, ya que el primero prueba si el índice de calidad muscular mejora la predicción con 18 predictoras y varios modelos de ML (el SVM obtuvo un AUC de 0.713 y el mejor modelo, LGBM, de 0.746) y el segundo compara nueve índices sencillos de tamizaje, entre los que el mejor, TyG-WHtR, alcanzó un AUC de 0.776. \citet{goulian2026} usa NHANES con el mismo ciclo 2021 a 2023 y el mismo criterio, pero con un enfoque explicativo basado en regresión logística, y encuentra que la obesidad y la alteración en la regulación de la glucosa se asocian fuertemente con la deficiencia.
+
+\citet{novaes2021} y \citet{kivrak2024} trabajan con pacientes de Brasil, no con NHANES. El primero compara 10 clasificadores base y tres métodos de ensamble con una cohorte hospitalaria de 3397 pacientes y encuentra que XGBoost fue el mejor clasificador base y que el ensamble por promedio ponderado tuvo el mejor desempeño general, y el segundo estudia el efecto de SMOTE en 1886 pacientes con diabetes tipo 2 con solo cinco predictoras, y con SMOTE la sensibilidad de XGBoost llegó a 0.52, mientras que la de la regresión logística fue de 0.19. Por último, \citet{tong2025} no trata de testosterona sino de síndrome de ovario poliquístico, pero se incluyó porque compara los mismos cuatro tipos de modelo que este trabajo (XGBoost, Random Forest, SVM y regresión logística) con una muestra pequeña, y en ese caso la regresión logística fue la mejor con un AUC de 0.934.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{p{3.0cm} p{3.6cm} p{2.9cm} p{4.6cm}}
+\toprule
+Trabajo & Datos & Modelos & Resultado principal \\
+\midrule
+\citet{yu2025} & NHANES 2011 a 2014, 2628 hombres, 25.76\% con deficiencia, 18 predictoras & SVM, LGBM, GBDT, CatBoost, XGBoost, RF & Mejor modelo LGBM, AUC 0.746; SVM, AUC 0.713 \\
+\citet{zhang2025} & NHANES 2013 a 2016, 1514 hombres, 23.59\% con deficiencia & Nueve índices simples y regresión logística & Mejor índice TyG-WHtR, AUC 0.776 \\
+\citet{goulian2026} & NHANES 2011 a 2016 y 2021 a 2023, 10357 participantes & Regresión logística (explicativa) & Obesidad y glucosa alterada asociadas a la deficiencia \\
+\citet{novaes2021} & Cohorte hospitalaria de Brasil, 3397 pacientes & 10 clasificadores y 3 ensambles & Mejor base XGBoost; mejor general el promedio ponderado \\
+\citet{kivrak2024} & 1886 pacientes con diabetes tipo 2 de Brasil, 5 predictoras & MLP, RF, ELM, RL, AdaBoost, XGBoost, SGB, con y sin SMOTE & XGBoost con SMOTE: sensibilidad 0.52 y F1 0.51 \\
+\citet{tong2025} & Hospital de China, 159 participantes (84 con síndrome de ovario poliquístico y 75 sanas) & XGBoost, RF, SVM, RL y Naive Bayes & Mejor modelo regresión logística, AUC 0.934 \\
+\bottomrule
+\end{tabular}
+\caption{Trabajos relacionados revisados.}
+\label{tab:literatura}
+\end{table}
+
+Estos trabajos no son comparables de forma directa con el presente, ya que cambian la población, las variables, el protocolo experimental y hasta las métricas, pero muestran dos cosas que guían este proyecto, que los modelos basados en árboles y los ensambles suelen ser competitivos en este tipo de problema, y que el desbalance de clases obliga a tratar con cuidado la sensibilidad. A diferencia de ellos, este trabajo incluye entre las predictoras a SHBG, estradiol, LH y FSH, que pertenecen al mismo eje hormonal que la testosterona.
+
+\subsection{Planteamiento y objetivos}
+
+El objetivo general es construir y comparar cuatro modelos de clasificación para identificar a hombres adultos con deficiencia de testosterona, y ponerlos a disposición mediante una interfaz. Los objetivos específicos son:
+
+\begin{itemize}
+  \item Preparar los datos de NHANES 2021 a 2023 con un procedimiento sin fuga de información entre entrenamiento y prueba.
+  \item Entrenar y optimizar una Regresión Logística, un SVM, un Random Forest y un XGBoost con el mismo protocolo, para que la comparación sea justa.
+  \item Elegir para cada modelo un umbral de decisión que dé prioridad a detectar los casos, ya que la deficiencia es la clase minoritaria.
+  \item Evaluar los modelos una sola vez en un conjunto de prueba independiente y analizar qué variables pesan más.
+  \item Implementar una interfaz en Streamlit que use los modelos entrenados.
+\end{itemize}
+
+%==========================================================================
+\section{Metodología}
+
+\subsection{Base de datos}
+
+\subsubsection{Fuente y construcción}
+
+Los datos provienen de la encuesta NHANES (National Health and Nutrition Examination Survey) del National Center for Health Statistics del CDC, ciclo 2021 a 2023 \citep{cdc_nhanes}. Se unieron siete archivos de la encuesta por el identificador del participante (\texttt{SEQN}) partiendo de los datos demográficos: demografía (DEMO\_L), panel de hormonas esteroides sexuales (TST\_L), medidas corporales (BMX\_L), diabetes (DIQ\_L), presión arterial (BPQ\_L), alcohol (ALQ\_L) y tabaco (SMQ\_L). Después se conservaron solo los hombres de 20 años o más con la testosterona total medida, ya que de ella depende la variable objetivo, y se aplicó la regla de que el consumo de alcohol vale cero cuando el participante nunca tomó o no tomó en los últimos 12 meses, porque en esos casos NHANES no hace la pregunta y el valor queda en blanco aunque el consumo real es cero. Se eliminaron los duplicados por identificador y toda fila con más de 30\% de datos faltantes entre las predictoras, lo que dejó \textbf{2514 hombres}.
+
+\subsubsection{Variable objetivo y variables predictoras}
+
+La variable objetivo es \texttt{deficiencia\_testosterona}, que vale 1 cuando la testosterona total es menor a 300 ng/dL y 0 en caso contrario, siguiendo el criterio de la AUA \citep{mulhall2018}, aunque cabe aclarar que se trata de una definición bioquímica con una sola medición por participante y no del diagnóstico clínico completo, que según esa guía requiere dos mediciones y síntomas, lo que da un problema de clasificación binaria con 1955 hombres normales (77.8\%) y 559 con deficiencia (22.2\%), es decir, con clases desbalanceadas. Se usan 13 variables predictoras, 8 numéricas y 5 categóricas (Tabla~\ref{tab:variables}), y se excluyeron el identificador, que no tiene significado clínico, y la testosterona total, ya que con ella se calcula el objetivo y dejarla permitiría acertar casi perfecto sin aprender nada útil, lo que sería fuga de información.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{l l l p{6.2cm}}
+\toprule
+Variable & Código NHANES & Tipo & Descripción \\
+\midrule
+edad & RIDAGEYR & Numérica & Edad en años (20 a 80) \\
+imc & BMXBMI & Numérica & Índice de masa corporal (kg/m$^2$) \\
+cintura & BMXWAIST & Numérica & Circunferencia de la cintura (cm) \\
+shbg & LBXSHBG & Numérica & Globulina fijadora de hormonas sexuales (nmol/L) \\
+estradiol & LBXEST & Numérica & Estradiol (pg/mL) \\
+lh & LBXLUH & Numérica & Hormona luteinizante (mIU/mL) \\
+fsh & LBXFSH & Numérica & Hormona folículo estimulante (mIU/mL) \\
+tragos\_por\_dia & ALQ130 & Numérica & Promedio de tragos de alcohol por día en los últimos 12 meses \\
+diabetes & DIQ010 & Categórica & Sí, No o Prediabetes \\
+hipertension & BPQ020 & Categórica & Diagnóstico de hipertensión (Sí o No) \\
+fumador & SMQ020 & Categórica & Ha fumado al menos 100 cigarrillos en su vida (Sí o No) \\
+raza\_etnia & RIDRETH3 & Categórica & Seis categorías de raza y origen étnico \\
+escolaridad & DMDEDUC2 & Categórica & Cinco niveles de escolaridad \\
+\bottomrule
+\end{tabular}
+\caption{Variables predictoras.}
+\label{tab:variables}
+\end{table}
+
+\subsubsection{Partición y análisis exploratorio}
+
+Los datos se dividieron en 80\% para entrenamiento (2011 hombres) y 20\% para prueba (503 hombres) de forma estratificada con semilla 42, de modo que ambos conjuntos conservan el 22.2\% de casos positivos, y el conjunto de prueba se mantuvo aislado hasta la evaluación final. El análisis exploratorio se hizo solo sobre el conjunto de entrenamiento. Los faltantes se concentran en el consumo de alcohol (12.4\%), seguido de la cintura (3.7\%), el IMC (1.2\%) y el estradiol (0.5\%), y además hay respuestas de «rehuso» o «no sabe» que NHANES guarda como números (7, 9, 777 y 999) y que en realidad también son faltantes. Las escalas de las variables son muy distintas, por ejemplo la edad va de 20 a 80 mientras que la SHBG llega a 232.6, y las hormonas tienen distribuciones cargadas a la derecha con valores extremos.
+
+Las variables más relacionadas con el objetivo (Figura~\ref{fig:correlaciones}) son la cintura (0.31) y el IMC (0.31) en sentido positivo, y la SHBG ($-$0.29) y el estradiol ($-$0.24) en sentido negativo, es decir, que a más obesidad y menor SHBG y estradiol, mayor frecuencia de deficiencia. Entre las categóricas, la deficiencia es más frecuente en quienes tienen diabetes (36.3\% contra 19.2\%) y en quienes tienen hipertensión (27.1\% contra 19.1\%). También hay pares de predictoras muy correlacionadas entre sí, el IMC con la cintura (0.92) y la LH con la FSH (0.84).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{figuras/correlaciones.png}
+\caption{Correlación de Pearson de cada variable numérica con la deficiencia de testosterona en el conjunto de entrenamiento.}
+\label{fig:correlaciones}
+\end{figure}
+
+\subsection{Modelos}
+
+Se compararon cuatro modelos de clasificación de familias distintas, y para los cuatro se calcula la probabilidad de pertenecer a la clase «deficiencia», que es lo que usa la interfaz.
+
+\textbf{Regresión Logística.} Modela la probabilidad como $P(y=1\mid x)=\sigma(w^{\top}x+b)$, con $\sigma$ la función sigmoide. Es el modelo más sencillo de interpretar y el punto de partida del proyecto F\_1 \citep{garay_f1}. Se exploró la regularización L1 y L2 y el parámetro $C$ (a mayor $C$, menor regularización).
+
+\textbf{SVM con kernel RBF.} Busca la frontera de máximo margen entre las clases y, con el kernel $K(x,x')=\exp(-\gamma\lVert x-x'\rVert^2)$, permite fronteras no lineales \citep{cortes1995, sklearn_svm}. Sus hiperparámetros son $C$, que controla cuánto se castigan los errores y las violaciones del margen, y $\gamma$, que define qué tan lejos llega la influencia de cada punto. Como el SVM no entrega probabilidades por sí solo, se calibró con una función sigmoide (\texttt{CalibratedClassifierCV}). Es el modelo del proyecto F\_2 \citep{garay_f2}.
+
+\textbf{Random Forest.} Es un conjunto de árboles de decisión entrenados con muestras aleatorias de los datos y de las variables, cuya predicción es el promedio de los árboles, lo que reduce la varianza de los árboles individuales \citep{breiman2001}.
+
+\textbf{XGBoost.} Es una implementación de \emph{gradient boosting} en la que los árboles se construyen en secuencia y cada uno corrige los errores del anterior \citep{chen2016, xgboost_docs}. Sus hiperparámetros principales son el número de árboles, la tasa de aprendizaje, la profundidad máxima y el muestreo de filas y columnas.
+
+Como la clase positiva es solo el 22.2\%, en los modelos se exploró compensar el desbalance con \texttt{class\_weight=balanced}, que da más peso a los errores en la clase minoritaria, y en XGBoost con el parámetro \texttt{scale\_pos\_weight}.
+
+\subsection{Implementación}
+
+\subsubsection{Preprocesamiento e imputación}
+
+Los códigos de «rehuso» y «no sabe» (7, 9, 777 y 999) se convierten en faltante y los códigos de las variables categóricas se cambian por su significado, y estas dos reglas son fijas y no aprenden nada de los datos, por lo que se aplican igual al conjunto de entrenamiento y al de prueba. Todo lo demás vive dentro de un \texttt{Pipeline} de scikit-learn \citep{pedregosa2011, sklearn_compose} para que se ajuste solo con los datos de entrenamiento de cada fold y no haya fuga de información (Tabla~\ref{tab:pipeline}). Las variables numéricas se imputan con la mediana y se escalan con \texttt{StandardScaler}, ya que SVM y Regresión Logística son sensibles a la escala, y las categóricas se imputan con la moda y se codifican con \texttt{OneHotEncoder}. Que la imputación esté dentro del Pipeline permite además que la interfaz deje una variable vacía, que se reemplaza por la mediana de los datos de entrenamiento.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{l p{4.2cm} p{6.0cm}}
+\toprule
+Tipo de variable & Variables & Transformaciones \\
+\midrule
+Numéricas (8) & edad, imc, cintura, shbg, estradiol, lh, fsh, tragos\_por\_dia & Imputación por mediana y \texttt{StandardScaler} \\
+Categóricas (5) & diabetes, hipertension, fumador, raza\_etnia, escolaridad & Imputación por moda y \texttt{OneHotEncoder} \\
+\bottomrule
+\end{tabular}
+\caption{Preprocesamiento dentro del Pipeline (\texttt{ColumnTransformer}).}
+\label{tab:pipeline}
+\end{table}
+
+\subsubsection{Validación cruzada y optimización de hiperparámetros}
+
+Para los cuatro modelos se usó validación cruzada estratificada de 5 folds sobre el conjunto de entrenamiento y una búsqueda exhaustiva de hiperparámetros con \texttt{GridSearchCV} que maximiza el ROC AUC \citep{sklearn_cv}, una métrica que mide qué tan bien el modelo ordena a los hombres con deficiencia por encima de los normales sin depender de un umbral, lo que importa con clases desbalanceadas porque la exactitud puede ser alta aunque el modelo casi no detecte a nadie (un modelo que siempre dice «normal» acertaría el 77.8\%). Las rejillas de Regresión Logística y SVM son las de los proyectos F\_1 y F\_2, y las de Random Forest y XGBoost se definieron para este proyecto (Tabla~\ref{tab:rejillas}).
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{l p{6.2cm} c p{3.3cm}}
+\toprule
+Modelo & Hiperparámetros explorados & Combinaciones & Mejor combinación \\
+\midrule
+Regresión Logística & $C$ entre 0.01 y 100, regularización L1 o L2, \texttt{class\_weight} & 20 & $C$ = 0.1, L1, \texttt{balanced} \\
+SVM (RBF) & $C$ entre 0.01 y 100, $\gamma$ entre 0.001 y 10 (o scale), \texttt{class\_weight} & 60 & $C$ = 10, $\gamma$ = 0.01, \texttt{balanced} \\
+Random Forest (300 árboles) & \texttt{max\_depth}, \texttt{min\_samples\_leaf}, \texttt{max\_features}, \texttt{class\_weight} & 48 & sin límite de profundidad, \texttt{min\_samples\_leaf}=3, \texttt{max\_features}=0.5, \texttt{balanced} \\
+XGBoost & \texttt{n\_estimators}, \texttt{learning\_rate}, \texttt{max\_depth}, \texttt{subsample}, \texttt{colsample\_bytree}, \texttt{scale\_pos\_weight} & 96 & 300 árboles, \texttt{learning\_rate}=0.03, \texttt{max\_depth}=2, \texttt{subsample}=0.7, \texttt{colsample\_bytree}=0.7, sin ponderar \\
+\bottomrule
+\end{tabular}
+\caption{Búsqueda de hiperparámetros y mejor combinación de cada modelo.}
+\label{tab:rejillas}
+\end{table}
+
+\subsubsection{Umbral de decisión}
+
+Con el umbral estándar de 0.5 los modelos detectan solo a una parte de los casos, por lo que para cada modelo se eligió el umbral con las probabilidades fuera de muestra (OOF) obtenidas con validación cruzada sobre el conjunto de entrenamiento, maximizando la métrica $F_2$, que da más peso al recall que a la precisión:
+\begin{equation}
+F_2 = \frac{5\cdot \text{precisión}\cdot\text{recall}}{4\cdot \text{precisión}+\text{recall}}.
+\end{equation}
+Se prefirió esa métrica porque en este problema dejar escapar un caso (falso negativo) cuesta más que pedir un análisis de sangre de más (falso positivo): un falso positivo significa mandar a confirmar a un hombre que no lo necesitaba, mientras que un falso negativo deja a un hombre con deficiencia sin diagnóstico ni tratamiento. El umbral queda fijo desde ese momento y no se vuelve a ajustar con el conjunto de prueba.
+
+\subsubsection{Interfaz en Streamlit}
+
+Los cuatro modelos entrenados con el conjunto de entrenamiento se guardaron con \texttt{joblib}, junto con un archivo de metadatos con los umbrales, las métricas y el rango de cada variable, y se usan desde una aplicación en Streamlit \citep{streamlit_docs}. La interfaz pide las 13 variables, con rangos y valores iniciales tomados de los datos de entrenamiento, y permite dejar vacíos el IMC, la cintura, el estradiol y los tragos por día, que son las variables con faltantes en los datos, por lo que el Pipeline los reemplaza por la mediana. Al presionar el botón de predicción muestra, para cada modelo elegido, la probabilidad de deficiencia, su umbral y si marca posible deficiencia, junto con un resumen de cuántos modelos coinciden y una gráfica (Figura~\ref{fig:interfaz}). Incluye además una explicación de cómo leer el resultado, la tabla de desempeño en el conjunto de prueba y un aviso de que es un proyecto académico y no un dispositivo médico.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.62\textwidth]{figuras/interfaz_resultado.png}
+\caption{Interfaz en Streamlit con el caso de ejemplo: datos capturados (con la cintura vacía) y resultado de los cuatro modelos.}
+\label{fig:interfaz}
+\end{figure}
+
+\subsubsection{Herramientas}
+
+Todo se implementó en Python 3.12 con scikit-learn 1.9.1 \citep{pedregosa2011}, XGBoost 3.4.1, pandas 3.1.0, NumPy 2.5.4, Matplotlib 3.11.2 y Streamlit 1.66.1, con semilla 42 en todos los procesos aleatorios. El código, los modelos y las versiones exactas de las librerías están en la carpeta del proyecto.
+
+\subsection{Resultados}
+
+\subsubsection{Modelos con parámetros por defecto y optimizados}
+
+Con los parámetros por defecto (Tabla~\ref{tab:defecto}) los cuatro modelos quedan en un ROC AUC de 0.864 a 0.890 en validación cruzada, y todos comparten el mismo problema, ya que el recall se queda entre 0.48 y 0.56, es decir, detectan a solo la mitad de los hombres con deficiencia porque ninguno compensa el desbalance de clases. Random Forest y XGBoost además llegan a un ROC AUC de 1.000 en los folds de entrenamiento, lo que muestra que memorizan los datos y necesitan regularización.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{l c c c c c c}
+\toprule
+Modelo & Exactitud & Precisión & Recall & F1 & ROC AUC & AUC entren. \\
+\midrule
+Regresión Logística & 0.841 & 0.696 & 0.508 & 0.584 & 0.866 & 0.876 \\
+SVM & 0.841 & 0.716 & 0.481 & 0.573 & 0.877 & 0.932 \\
+Random Forest & 0.854 & 0.756 & 0.510 & 0.608 & 0.890 & 1.000 \\
+XGBoost & 0.833 & 0.645 & 0.562 & 0.600 & 0.864 & 1.000 \\
+\bottomrule
+\end{tabular}
+\caption{Modelos con parámetros por defecto, promedio de la validación cruzada de 5 folds (umbral 0.5).}
+\label{tab:defecto}
+\end{table}
+
+La optimización (Tabla~\ref{tab:optimizados}) ayudó poco a la Regresión Logística, al SVM y al Random Forest (de 0.003 a 0.007 de ROC AUC), pero mucho a XGBoost, que subió de 0.864 a 0.896 y bajó su ROC AUC de entrenamiento de 1.000 a 0.934, porque eligió árboles de profundidad 2 con una tasa de aprendizaje de 0.03 y muestreo de filas y columnas, lo que sugiere que la relación entre las variables y la deficiencia es suave y con pocas interacciones. Los tres mejores modelos quedan casi empatados, ya que sus diferencias (0.896, 0.894 y 0.884) son menores o parecidas a la desviación entre folds.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{l c c c c}
+\toprule
+Modelo & ROC AUC (CV) & Desviación & ROC AUC entrenamiento & Recall (CV, umbral 0.5) \\
+\midrule
+Regresión Logística & 0.868 & 0.019 & 0.873 & 0.839 \\
+SVM & 0.884 & 0.022 & 0.912 & 0.834 \\
+Random Forest & 0.894 & 0.008 & 0.999 & 0.772 \\
+XGBoost & 0.896 & 0.014 & 0.934 & 0.553 \\
+\bottomrule
+\end{tabular}
+\caption{Mejor combinación de hiperparámetros de cada modelo en validación cruzada.}
+\label{tab:optimizados}
+\end{table}
+
+\subsubsection{Umbral de decisión}
+
+El umbral que maximiza $F_2$ es distinto en cada modelo (Tabla~\ref{tab:oof} y Figura~\ref{fig:umbrales}), 0.45 en la Regresión Logística, 0.35 en Random Forest, 0.22 en SVM y 0.16 en XGBoost, lo que no significa que unos sean mejores que otros sino que cada uno reparte sus probabilidades de forma diferente. Con esos umbrales los cuatro quedan en un recall parecido, de 0.85 a 0.88 en las predicciones fuera de muestra, y lo que cambia es el costo en falsas alarmas, que va de 357 en el SVM a 437 en la Regresión Logística.
+
+\begin{table}[H]
+\setlength{\tabcolsep}{4pt}
+\centering
+\small
+\begin{tabular}{l c c c c c c c c}
+\toprule
+Modelo & Umbral & Precisión & Recall & F1 & ROC AUC & FP & FN & TP \\
+\midrule
+Regresión Logística & 0.45 & 0.472 & 0.872 & 0.612 & 0.868 & 437 & 57 & 390 \\
+SVM & 0.22 & 0.516 & 0.852 & 0.643 & 0.883 & 357 & 66 & 381 \\
+Random Forest & 0.35 & 0.511 & 0.868 & 0.643 & 0.892 & 371 & 59 & 388 \\
+XGBoost & 0.16 & 0.496 & 0.881 & 0.634 & 0.895 & 401 & 53 & 394 \\
+\bottomrule
+\end{tabular}
+\caption{Predicciones fuera de muestra sobre el conjunto de entrenamiento (2011 hombres, 447 con deficiencia) con el umbral elegido.}
+\label{tab:oof}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figuras/umbrales.png}
+\caption{Precisión, recall y $F_2$ según el umbral de decisión para cada modelo, con las predicciones fuera de muestra. La línea punteada marca el umbral elegido.}
+\label{fig:umbrales}
+\end{figure}
+
+\subsubsection{Evaluación en el conjunto de prueba}
+
+Los modelos se ajustaron con todo el conjunto de entrenamiento y se evaluaron una sola vez en el conjunto de prueba (503 hombres, 112 con deficiencia), con el umbral de cada uno fijo desde la fase anterior (Tabla~\ref{tab:test} y Figuras~\ref{fig:matrices} y~\ref{fig:roc}). Los cuatro modelos detectan a casi los mismos hombres con deficiencia, 98 o 99 de los 112, con 13 o 14 casos que se escapan, por lo que la diferencia está en las falsas alarmas, 80 en el SVM y en el Random Forest, 97 en XGBoost y 118 en la Regresión Logística. El mejor ROC AUC es el del SVM (0.901), seguido por XGBoost (0.898), Random Forest (0.892) y Regresión Logística (0.866), y el mejor F1 es de nuevo el del SVM (0.680), con Random Forest muy cerca (0.676), lo que coincide con la validación cruzada en que los tres modelos no lineales son casi equivalentes y la Regresión Logística queda claramente detrás en precisión (0.454 contra 0.55). Los resultados de la Regresión Logística y del SVM coinciden con los de los proyectos F\_1 y F\_2, lo que confirma que la partición, el preprocesamiento y la semilla son los mismos.
+
+\begin{table}[H]
+\setlength{\tabcolsep}{4pt}
+\centering
+\small
+\begin{tabular}{l c c c c c c c c c c}
+\toprule
+Modelo & Umbral & Exact. & Prec. & Recall & F1 & ROC AUC & TN & FP & FN & TP \\
+\midrule
+Regresión Logística & 0.45 & 0.738 & 0.454 & 0.875 & 0.598 & 0.866 & 273 & 118 & 14 & 98 \\
+SVM & 0.22 & 0.815 & 0.553 & 0.884 & 0.680 & 0.901 & 311 & 80 & 13 & 99 \\
+Random Forest & 0.35 & 0.813 & 0.551 & 0.875 & 0.676 & 0.892 & 311 & 80 & 14 & 98 \\
+XGBoost & 0.16 & 0.781 & 0.505 & 0.884 & 0.643 & 0.898 & 294 & 97 & 13 & 99 \\
+\bottomrule
+\end{tabular}
+\caption{Evaluación en el conjunto de prueba (503 hombres, 112 con deficiencia).}
+\label{tab:test}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figuras/matrices_confusion.png}
+\caption{Matrices de confusión en el conjunto de prueba con el umbral de cada modelo.}
+\label{fig:matrices}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{figuras/curvas_roc.png}
+\caption{Curvas ROC en el conjunto de prueba.}
+\label{fig:roc}
+\end{figure}
+
+El umbral elegido es lo que hace que los modelos sean útiles (Tabla~\ref{tab:umbral05}), ya que con el umbral estándar de 0.5 el recall de XGBoost cae de 0.884 a 0.473 y el del SVM de 0.884 a 0.509, es decir que dejarían escapar a la mitad de los casos, aunque con muchas menos falsas alarmas.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{l c c c c c c}
+\toprule
+Modelo & Exactitud & Precisión & Recall & F1 & FP & FN \\
+\midrule
+Regresión Logística & 0.775 & 0.497 & 0.795 & 0.612 & 90 & 23 \\
+SVM & 0.845 & 0.712 & 0.509 & 0.594 & 23 & 55 \\
+Random Forest & 0.831 & 0.603 & 0.705 & 0.650 & 52 & 33 \\
+XGBoost & 0.833 & 0.679 & 0.473 & 0.558 & 25 & 59 \\
+\bottomrule
+\end{tabular}
+\caption{Evaluación en el conjunto de prueba con el umbral estándar de 0.5 (el ROC AUC no cambia).}
+\label{tab:umbral05}
+\end{table}
+
+\subsubsection{Importancia de variables}
+
+Los tres tipos de modelo coinciden en las variables más importantes (Figura~\ref{fig:importancia}), SHBG y estradiol, que ocupan el primer y segundo lugar tanto en Random Forest (0.26 y 0.22) como en XGBoost (0.14 y 0.12) y que en la Regresión Logística tienen los coeficientes más grandes y negativos, lo que significa que a menor SHBG y menor estradiol, mayor probabilidad de deficiencia. Después aparecen la cintura, el IMC y la edad en los modelos de árboles, y en la Regresión Logística el IMC, la FSH y la edad tienen coeficientes positivos, mientras que la cintura casi no recibe coeficiente, seguramente porque se parece mucho al IMC (correlación de 0.92). Esto coincide con el análisis exploratorio y con \citet{goulian2026}, que asocia la obesidad con la deficiencia. La escolaridad y la raza aportan muy poco.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figuras/importancia_variables.png}
+\caption{Coeficientes de la Regresión Logística e importancia de variables en Random Forest y XGBoost (las 10 principales).}
+\label{fig:importancia}
+\end{figure}
+
+\subsubsection{Ejemplo con la interfaz}
+
+Como ilustración, se capturó en la interfaz un hombre de 55 años con IMC de 33.0, SHBG de 25.0 nmol/L, estradiol de 28.0 pg/mL, LH de 3.5 mIU/mL, FSH de 5.0 mIU/mL, 2 tragos por día, diabetes, hipertensión, tabaquismo, raza blanca no hispana, preparatoria completa y la cintura vacía, como se ve en la Figura~\ref{fig:interfaz}. Las probabilidades de los cuatro modelos y su umbral se muestran en la Tabla~\ref{tab:ejemplo}, y como las cuatro superan su umbral la interfaz marca posible deficiencia en los cuatro, lo que es una señal más confiable que cuando solo uno de los modelos la marca.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{l c c l}
+\toprule
+Modelo & Probabilidad & Umbral & Resultado \\
+\midrule
+Regresión Logística & 0.619 & 0.45 & Posible deficiencia \\
+SVM & 0.372 & 0.22 & Posible deficiencia \\
+Random Forest & 0.754 & 0.35 & Posible deficiencia \\
+XGBoost & 0.419 & 0.16 & Posible deficiencia \\
+\bottomrule
+\end{tabular}
+\caption{Predicción de la interfaz para un caso de ejemplo.}
+\label{tab:ejemplo}
+\end{table}
+
+\subsubsection{Comparación con la literatura}
+
+El ROC AUC en el conjunto de prueba de este trabajo (de 0.866 a 0.901) es mayor que el del SVM de \citet{yu2025} (0.713), que el de su mejor modelo (0.746) y que el del mejor índice de \citet{zhang2025} (0.776), pero no se puede concluir que los modelos sean mejores, ya que cambian la población, las variables y el protocolo, y la razón principal de la diferencia es probablemente el uso de SHBG, estradiol, LH y FSH, que están en el mismo eje hormonal que la testosterona, mientras que esos trabajos predicen con variables más indirectas. Además el conjunto de prueba de este trabajo tiene solo 112 casos positivos, lo que agrega incertidumbre a todas las métricas.
+
+%==========================================================================
+\section{Conclusiones}
+
+Se entrenaron y compararon cuatro modelos, Regresión Logística, SVM, Random Forest y XGBoost, con el mismo procedimiento sobre los datos de NHANES 2021 a 2023, y se integraron en una interfaz en Streamlit. El SVM obtuvo el mejor resultado en el conjunto de prueba (ROC AUC de 0.901 y F1 de 0.680), pero XGBoost y Random Forest quedaron a menos de 0.01 de ROC AUC, una diferencia menor que la desviación entre folds, por lo que no se puede decir que uno sea claramente mejor que los otros dos. La Regresión Logística fue el modelo más débil, sobre todo en precisión (0.454 contra más de 0.5 de los demás), aunque tiene la ventaja de ser el más fácil de interpretar. Que los árboles más simples hayan ganado en la optimización y que los modelos no lineales solo mejoren un poco al lineal sugiere que la relación entre las variables y la deficiencia es principalmente suave y cercana a lo lineal.
+
+El umbral de decisión resultó tan importante como el modelo, ya que con el umbral de 0.5 los modelos dejan escapar a cerca de la mitad de los casos y con el umbral elegido detectan a cerca del 88\%, aunque a cambio la precisión queda entre 45\% y 55\%, es decir que casi la mitad de las alertas son falsas alarmas. Esto es aceptable para una herramienta de apoyo que solo sugiere confirmar con un análisis de sangre, pero no para un diagnóstico, y tampoco para un tamizaje en la población general, que la guía de la Endocrine Society no recomienda \citep{bhasin2018}, por lo que la herramienta tendría sentido para apoyar la decisión de a quién pedirle el análisis entre hombres con síntomas o factores de riesgo. En cuanto a las variables, SHBG y estradiol fueron las más importantes en los tres tipos de modelo, seguidas de la cintura, el IMC y la edad, lo que coincide con la literatura que relaciona la obesidad con la testosterona baja.
+
+El trabajo tiene varias limitaciones. La partición es única, y con solo 112 casos positivos en el conjunto de prueba las diferencias pequeñas entre modelos no son concluyentes. Los modelos se entrenaron solo con el conjunto de entrenamiento para conservar válido el de prueba, y los umbrales se eligieron con esos mismos datos, por lo que en una población con otra frecuencia de deficiencia la precisión sería distinta. Además, las probabilidades no son un riesgo clínico exacto, solo sirven para ordenar y comparar casos, y los datos son de Estados Unidos, por lo que no se sabe qué tan bien funcionarían en otras poblaciones. Como trabajo futuro se podría reentrenar con todos los datos, probar un ensamble de los cuatro modelos, validar con otro ciclo de NHANES o con datos de otra población, y calibrar las probabilidades.
+
+Para el uso de la interfaz lo recomendable es comparar la coincidencia de los cuatro modelos, ya que cuando los cuatro marcan posible deficiencia la señal es más confiable que cuando solo uno lo hace.
+
+%==========================================================================
+\bibliographystyle{plainnat}
+\bibliography{referencias}
+
+\end{document}

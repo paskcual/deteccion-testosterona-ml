@@ -1,0 +1,208 @@
+{
+  "version_sklearn": "1.9.1",
+  "version_xgboost": "3.4.1",
+  "semilla": 42,
+  "filas_train": 2011,
+  "filas_test": 503,
+  "prevalencia_train": 0.2222774738935853,
+  "orden_columnas": [
+    "edad",
+    "imc",
+    "cintura",
+    "shbg",
+    "estradiol",
+    "lh",
+    "fsh",
+    "tragos_por_dia",
+    "diabetes",
+    "hipertension",
+    "fumador",
+    "raza_etnia",
+    "escolaridad"
+  ],
+  "variables_numericas": {
+    "edad": {
+      "minimo": 20.0,
+      "maximo": 80.0,
+      "mediana": 58.0,
+      "faltantes_en_train": 0
+    },
+    "imc": {
+      "minimo": 17.1,
+      "maximo": 68.9,
+      "mediana": 28.0,
+      "faltantes_en_train": 24
+    },
+    "cintura": {
+      "minimo": 63.5,
+      "maximo": 187.0,
+      "mediana": 101.7,
+      "faltantes_en_train": 75
+    },
+    "shbg": {
+      "minimo": 5.49,
+      "maximo": 232.6,
+      "mediana": 36.89,
+      "faltantes_en_train": 0
+    },
+    "estradiol": {
+      "minimo": 1.22,
+      "maximo": 187.0,
+      "mediana": 23.9,
+      "faltantes_en_train": 10
+    },
+    "lh": {
+      "minimo": 0.07,
+      "maximo": 80.49,
+      "mediana": 5.62,
+      "faltantes_en_train": 0
+    },
+    "fsh": {
+      "minimo": 0.21,
+      "maximo": 124.1,
+      "mediana": 5.65,
+      "faltantes_en_train": 0
+    },
+    "tragos_por_dia": {
+      "minimo": 0.0,
+      "maximo": 15.0,
+      "mediana": 2.0,
+      "faltantes_en_train": 249
+    }
+  },
+  "variables_categoricas": {
+    "diabetes": {
+      "opciones": [
+        "Si",
+        "No",
+        "Prediabetes"
+      ],
+      "moda": "No"
+    },
+    "hipertension": {
+      "opciones": [
+        "Si",
+        "No"
+      ],
+      "moda": "No"
+    },
+    "fumador": {
+      "opciones": [
+        "Si",
+        "No"
+      ],
+      "moda": "No"
+    },
+    "raza_etnia": {
+      "opciones": [
+        "Mexico americano",
+        "Otro hispano",
+        "Blanco no hispano",
+        "Negro no hispano",
+        "Asiatico no hispano",
+        "Otra o multirracial"
+      ],
+      "moda": "Blanco no hispano"
+    },
+    "escolaridad": {
+      "opciones": [
+        "Menos de 9 grado",
+        "9 a 11 grado",
+        "Preparatoria completa",
+        "Universidad incompleta",
+        "Universidad completa o mas"
+      ],
+      "moda": "Universidad completa o mas"
+    }
+  },
+  "modelos": {
+    "Regresion Logistica": {
+      "archivo": "regresion_logistica.joblib",
+      "umbral": 0.45,
+      "hiperparametros": {
+        "C": 0.1,
+        "class_weight": "balanced",
+        "l1_ratio": 1
+      },
+      "roc_auc_cv": 0.8683589796771403,
+      "metricas_test": {
+        "Accuracy": 0.7375745526838966,
+        "Precision": 0.4537037037037037,
+        "Recall": 0.875,
+        "F1": 0.5975609756097561,
+        "ROC AUC": 0.8657974059188892,
+        "TN": 273,
+        "FP": 118,
+        "FN": 14,
+        "TP": 98
+      }
+    },
+    "SVM": {
+      "archivo": "svm.joblib",
+      "umbral": 0.22,
+      "hiperparametros": {
+        "C": 10,
+        "class_weight": "balanced",
+        "gamma": 0.01
+      },
+      "roc_auc_cv": 0.8841621766516765,
+      "metricas_test": {
+        "Accuracy": 0.8151093439363817,
+        "Precision": 0.553072625698324,
+        "Recall": 0.8839285714285714,
+        "F1": 0.6804123711340206,
+        "ROC AUC": 0.9013061746437705,
+        "TN": 311,
+        "FP": 80,
+        "FN": 13,
+        "TP": 99
+      }
+    },
+    "Random Forest": {
+      "archivo": "random_forest.joblib",
+      "umbral": 0.35,
+      "hiperparametros": {
+        "class_weight": "balanced",
+        "max_depth": null,
+        "max_features": 0.5,
+        "min_samples_leaf": 3
+      },
+      "roc_auc_cv": 0.893809811085451,
+      "metricas_test": {
+        "Accuracy": 0.8131212723658051,
+        "Precision": 0.550561797752809,
+        "Recall": 0.875,
+        "F1": 0.6758620689655173,
+        "ROC AUC": 0.8923319327731092,
+        "TN": 311,
+        "FP": 80,
+        "FN": 14,
+        "TP": 98
+      }
+    },
+    "XGBoost": {
+      "archivo": "xgboost.joblib",
+      "umbral": 0.16,
+      "hiperparametros": {
+        "colsample_bytree": 0.7,
+        "learning_rate": 0.03,
+        "max_depth": 2,
+        "n_estimators": 300,
+        "scale_pos_weight": 1,
+        "subsample": 0.7
+      },
+      "roc_auc_cv": 0.8956500112959889,
+      "metricas_test": {
+        "Accuracy": 0.7813121272365805,
+        "Precision": 0.5051020408163265,
+        "Recall": 0.8839285714285714,
+        "F1": 0.6428571428571429,
+        "ROC AUC": 0.8975383631713555,
+        "TN": 294,
+        "FP": 97,
+        "FN": 13,
+        "TP": 99
+      }
+    }
+  }
+}
