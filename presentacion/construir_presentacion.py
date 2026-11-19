@@ -250,7 +250,8 @@ for i, (num, tit, sub) in enumerate(bloques):
 sl = diapositiva("1. Introducción y antecedentes", "La deficiencia de testosterona suele pasar desapercibida",
                  fuentes="[2], [3], [4]", notas=(
     "Tiempo sugerido: 2 minutos.\n"
-    "La deficiencia de testosterona, que también se llama hipogonadismo bioquímico, se define con un criterio de laboratorio, "
+    "El área de aplicación es la salud masculina, entre la endocrinología y la urología, que son las dos especialidades de las guías "
+    "que uso como referencia. La deficiencia de testosterona, que también se llama hipogonadismo bioquímico, se define con un criterio de laboratorio, "
     "ya que la guía de la American Urological Association considera razonable un corte de 300 ng/dL de testosterona total y pide "
     "confirmarla con dos mediciones matutinas y con síntomas, lo que implica que la condición solo se detecta cuando alguien "
     "pide el análisis de sangre. En los cuatro ciclos de NHANES que analiza Goulian, que son 2011 a 2016 y 2021 a 2023, el 25.7% de los "
@@ -258,12 +259,12 @@ sl = diapositiva("1. Introducción y antecedentes", "La deficiencia de testoster
     "hace pensar en una herramienta que use datos fáciles de obtener para decidir a quién conviene pedirle el análisis.\n"
     "Idea principal: no se busca diagnosticar, sino priorizar."))
 texto(sl, 0.6, 1.6, 7.4, 4.9, [
+    "**Área de aplicación.** Salud masculina, entre la endocrinología y la urología, donde se decide a quién estudiarle las hormonas [2], [3].",
     "**Definición.** Testosterona total menor a 300 ng/dL, criterio de la American Urological Association [2].",
     "**Confirmación.** El diagnóstico requiere síntomas y mediciones matutinas repetidas [2], [3].",
     "**Asociaciones.** Obesidad (OR ajustado 2.69), glucosa alterada y diabetes se asocian con la deficiencia [4].",
-    "**El problema.** Solo se detecta cuando alguien pide el análisis de sangre, y las guías no recomiendan tamizarlo a toda la población [3].",
-    "**Idea del proyecto.** Usar datos fáciles de obtener para decidir a quién conviene pedirle ese análisis."],
-      size=19, vineta=True, espacio=10)
+    "**El problema y la idea.** Solo se detecta cuando alguien pide el análisis de sangre y las guías no recomiendan tamizar a toda la población [3]; se busca usar datos fáciles de obtener para decidir a quién pedírselo."],
+      size=18, vineta=True, espacio=9)
 tarjeta(sl, 8.5, 1.7, 4.2, 1.9, "25.7%", "de los hombres tenía deficiencia en NHANES (2011 a 2016 y 2021 a 2023); 20.3% en 2021 a 2023 [4]", size_cifra=44)
 tarjeta(sl, 8.5, 3.85, 4.2, 1.9, "300 ng/dL", "umbral de testosterona total que define la deficiencia [2]", size_cifra=38)
 
@@ -377,19 +378,26 @@ texto(sl, 4.75, 5.6, 7.95, 0.95, "No son predictoras: el identificador y la test
 # =============================================================================================
 sl = diapositiva("3.1 Análisis exploratorio (solo Train)", "Hallazgos del análisis exploratorio", notas=(
     "Tiempo sugerido: 1 minuto y 30 segundos.\n"
-    "El análisis exploratorio se hizo únicamente con Train, que tiene 2011 hombres, y muestra tres cosas, que son el desbalance de "
+    "El análisis exploratorio se hizo únicamente con Train, que tiene 2011 hombres, y muestra varias cosas, que son el desbalance de "
     "clases con 22% de positivos, unos pocos valores faltantes, destacando los tragos por día con 12.4% y la cintura con 3.7%, "
-    "y las correlaciones con el objetivo, donde la cintura y el IMC se relacionan positivamente con 0.31 y la SHBG y el estradiol "
-    "negativamente con 0.29 y 0.24. Además la cintura y el IMC están muy correlacionadas entre sí, con 0.92, lo que explica por "
-    "qué la regresión logística le da poco peso a una de las dos."))
-imagen(sl, "../../reporte-tecnico/figuras/correlaciones.png", 0.6, 1.6, 6.9, 4.1)
-texto(sl, 0.6, 5.75, 6.9, 0.8, "Correlación de Pearson de cada variable numérica con la deficiencia (Train, 2011 hombres).",
+    "y los valores atípicos, que con la regla del rango intercuartílico llegan a 9.6% en la FSH y a 6.8% en la LH, hormonas con "
+    "distribuciones muy sesgadas a la derecha. Decidí no eliminarlos, porque en variables sesgadas como las hormonas esos valores "
+    "altos son esperables y no necesariamente errores, y porque la imputación con la mediana y el escalado los toleran, mientras "
+    "que los árboles no se ven afectados. Las correlaciones con el objetivo muestran que la cintura y el IMC se relacionan "
+    "positivamente con 0.31 y la SHBG y el estradiol negativamente con 0.29 y 0.24, y como la cintura y el IMC están muy "
+    "correlacionadas entre sí, con 0.92, la regresión logística le da poco peso a una de las dos. Entre los antecedentes, la "
+    "deficiencia aparece en 36% de los hombres con diabetes contra 19% de los que no la tienen, y en 27% de los hipertensos contra 19%."))
+imagen(sl, "../../reporte-tecnico/figuras/correlaciones.png", 0.6, 1.6, 6.4, 3.7)
+texto(sl, 0.6, 5.4, 6.4, 0.8, "Correlación de Pearson de cada variable numérica con la deficiencia (Train, 2011 hombres).",
       size=13, color=MUTED)
-texto(sl, 7.8, 1.65, 4.9, 4.9, [
+texto(sl, 7.25, 1.6, 5.45, 4.95, [
     "**Desbalance:** 22.2% con deficiencia (447 de 2011 en Train)",
-    "**Faltantes en Train:** tragos por día 12.4%, cintura 3.7%, IMC 1.2%, estradiol 0.5%",
+    "**Faltantes:** tragos por día 12.4%, cintura 3.7%, IMC 1.2%, estradiol 0.5%",
+    "**Atípicos** (regla del IQR): FSH 9.6% y LH 6.8%, con distribuciones sesgadas a la derecha; no se eliminan",
     "**Más asociadas:** cintura (+0.31), IMC (+0.31), SHBG (-0.29) y estradiol (-0.24)",
-    "**Redundancia:** cintura e IMC se correlacionan 0.92 entre sí"], size=18, vineta=True, espacio=11)
+    "**Redundancia:** cintura e IMC se correlacionan 0.92 entre sí",
+    "**Antecedentes:** deficiencia en 36% con diabetes contra 19% sin ella, y en 27% con hipertensión contra 19%"],
+      size=16, vineta=True, espacio=8)
 
 # =============================================================================================
 # 9. Preparacion y fuga
@@ -402,12 +410,15 @@ sl = diapositiva("3.2 Preparación y procesamiento de los datos", "Preparación 
     "codificación, vive dentro de un Pipeline que se ajusta solo con los datos de entrenamiento de cada fold. Los códigos de "
     "rehuso y de no sabe, como 7, 9, 777 y 999, se pasan a faltante con una regla fija que no aprende nada de los datos, y el "
     "desbalance se trata con pesos de clase y con un umbral de decisión elegido con predicciones fuera de muestra, sin usar SMOTE, "
-    "porque con 22% de positivos el peso de clase fue suficiente y no se generan datos sintéticos."))
-pasos = [("1", "Se excluyen", "el identificador y la testosterona total (con ella se calcula el objetivo)"),
+    "porque con 22% de positivos el peso de clase fue suficiente y no se generan datos sintéticos. Además se conservan las trece "
+    "predictoras, sin selección ni reducción de variables, ya que la docente confirmó que con trece es suficiente y los modelos de "
+    "árboles y la penalización L1 de la regresión logística ya ponderan por sí solos la importancia de cada una, y los valores "
+    "atípicos de las hormonas no se eliminan por las razones que mencioné en el análisis exploratorio."))
+pasos = [("1", "Variables", "se excluyen el identificador y la testosterona total (con ella se calcula el objetivo); se conservan las 13 predictoras, sin selección ni reducción"),
          ("2", "Reglas fijas", "los códigos 7, 9, 777 y 999 pasan a faltante y los códigos se cambian por su significado"),
          ("3", "Partición", "80/20 estratificada con semilla 42: 2011 en Train y 503 en Test, antes de ajustar nada"),
          ("4", "Pipeline", "mediana y escalado en las numéricas, moda y OneHotEncoder en las categóricas, ajustados solo con Train de cada fold"),
-         ("5", "Desbalance", "pesos de clase y un umbral elegido con predicciones fuera de muestra; no se usa SMOTE"),
+         ("5", "Desbalance y atípicos", "pesos de clase y umbral elegido con predicciones fuera de muestra, sin SMOTE; los atípicos de las hormonas no se eliminan"),
          ("6", "Test aislado", "no se usa para elegir modelos, hiperparámetros ni umbral; se evalúa una sola vez")]
 for i, (num, tit, desc) in enumerate(pasos):
     col, fila = i % 2, i // 2
